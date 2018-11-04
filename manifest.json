@@ -1,0 +1,26 @@
+{
+    "manifest_version": 2,
+    "name": "DNSSEC-HSTS",
+    "description": "Upgrades HTTP to HTTPS for websites that support DANE; this prevents sslstrip-style attacks.",
+    "version": "1.0",
+    "developer": {
+        "name": "Jeremy Rand",
+        "url": "https://www.namecoin.org/"
+    },
+    "applications": {
+        "gecko": {
+            "id": "dnssec-hsts@namecoin.org"
+        }
+    },
+
+    "icons": {
+        "48": "icons/namecoin-coin.svg",
+        "96": "icons/namecoin-coin.svg"
+    },
+
+    "permissions": ["nativeMessaging", "webRequest", "webRequestBlocking", "http://*/*"],
+
+    "background": {
+        "scripts": ["background-script.js"]
+    }
+}
