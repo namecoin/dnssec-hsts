@@ -109,16 +109,7 @@ function upgradeSync(requestDetails) {
     upgrade = true;
   }
 
-  if (lookupError) {
-    return {"redirectUrl": compatBrowser.runtime.getURL("/pages/lookup_error/index.html")};
-  }
-  if (upgrade) {
-    url.protocol = "https:";
-    // Chromium doesn't support "upgradeToSecure", so we use "redirectUrl" instead
-    return {"redirectUrl": url.toString()};
-  }
-
-  return {};
+  return buildBlockingResponse(url, upgrade, lookupError);
 }
 
 function upgradeCompat(requestDetails) {
@@ -127,6 +118,36 @@ function upgradeCompat(requestDetails) {
   } else {
     return upgradeSync(requestDetails);
   }
+}
+
+function buildBlockingResponse(url, upgrade, lookupError) {
+  if (lookupError) {
+    return {"redirectUrl": compatBrowser.runtime.getURL("/pages/lookup_error/index.html")};
+  }
+  if (upgrade) {
+    if (onFirefox()) {
+      return {"upgradeToSecure": true};
+    }
+    url.protocol = "https:";
+    // Chromium and Edge don't support "upgradeToSecure", so we use "redirectUrl" instead
+    return {"redirectUrl": url.toString()};
+  }
+  return {};
+}
+
+function attachRequestListener() {
+  // add the listener,
+  // passing the filter argument and "blocking"
+  compatBrowser.webRequest.onBeforeRequest.addListener(
+    upgradeCompat,
+    {urls: [buildPattern(matchHost)]},
+    ["blocking"]
+  );
+}
+
+// Builds a match pattern for all HTTP URL's for the specified host
+function buildPattern(host) {
+  return "http://" + host + "/*";
 }
 
 // Based on https://stackoverflow.com/a/45985333
@@ -150,48 +171,44 @@ if (typeof browser !== "undefined") {
   compatBrowser = chrome;
 }
 
-/*
-On startup, connect to the "dnssec_hsts" app.
-*/
-var nativePort = compatBrowser.runtime.connectNative("org.namecoin.dnssec_hsts");
-
-// match pattern for the URLs to upgrade
-var pattern = "http://*/*";
-
+// Only used with native messaging
+var nativePort;
 var pendingUpgradeChecks = new Map();
 
-/*
-Listen for messages from the native DNSSEC app.
-*/
-nativePort.onMessage.addListener((response) => {
-  const host = response["host"];
-  const hasTLSA = response["hasTLSA"];
-  const ok = response["ok"];
+// host for match pattern for the URLs to upgrade
+var matchHost = "*.bit";
 
-  if (!ok) {
-    console.log("Native DNSSEC app error: " + host);
-  }
+// Firefox is the only browser that supports async onBeforeRequest, and
+// therefore is the only browser that we can use native messaging with.
+if (onFirefox()) {
+  /*
+  On startup, connect to the Namecoin "dnssec_hsts" app.
+  */
+  nativePort = compatBrowser.runtime.connectNative("org.namecoin.dnssec_hsts");
 
-  if(! pendingUpgradeChecks.has(host)) {
-    return;
-  }
+  /*
+  Listen for messages from the native DNSSEC app.
+  */
+  nativePort.onMessage.addListener((response) => {
+    const host = response["host"];
+    const hasTLSA = response["hasTLSA"];
+    const ok = response["ok"];
 
-  for (let item of pendingUpgradeChecks.get(host)) {
-    if (hasTLSA) {
-      item({"upgradeToSecure": true});
-      console.log("Upgraded via TLSA: " + host);
-    } else {
-      item({});
+    if (!ok) {
+      console.log("Native DNSSEC app error: " + host);
     }
-  }
 
-  pendingUpgradeChecks.delete(host);
-});
+    if(! pendingUpgradeChecks.has(host)) {
+      return;
+    }
 
-// add the listener,
-// passing the filter argument and "blocking"
-compatBrowser.webRequest.onBeforeRequest.addListener(
-  upgradeCompat,
-  {urls: [pattern]},
-  ["blocking"]
-);
+    for (let item of pendingUpgradeChecks.get(host)) {
+      item(buildBlockingResponse(null, hasTLSA, !ok));
+    }
+
+    pendingUpgradeChecks.delete(host);
+  });
+}
+
+attachRequestListener();
+
