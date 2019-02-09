@@ -44,15 +44,19 @@ function upgradeAsync(requestDetails) {
 }
 
 // Adapted from Tagide/chrome-bit-domain-extension
+// Returns true if timed out, returns false if hostname showed up
 function sleep(milliseconds, hostname) {
-	// synchronous XMLHttpRequests from Chrome extensions are not blocking event handlers. That's why we use this
-	// pretty little sleep function to try to get the IP of a .bit domain before the request times out.
-	var start = new Date().getTime();
-	for (var i = 0; i < 1e7; i++) {
-		if (((new Date().getTime() - start) > milliseconds) || (sessionStorage.getItem(hostname) != null)){
-			break;
-		}
-	}
+  // synchronous XMLHttpRequests from Chrome extensions are not blocking event handlers. That's why we use this
+  // pretty little sleep function to try to get the IP of a .bit domain before the request times out.
+  var start = new Date().getTime();
+  for (var i = 0; i < 1e7; i++) {
+    if ((new Date().getTime() - start) > milliseconds) {
+      return true;
+    }
+    if (sessionStorage.getItem(hostname) != null) {
+      return false;
+    }
+  }
 }
 
 // Compatibility for Chromium, which doesn't support async onBeforeRequest
@@ -63,6 +67,8 @@ function upgradeSync(requestDetails) {
   const hostname = url.hostname;
   const port = url.port;
 
+  var upgrade = false;
+
   // Adapted from Tagide/chrome-bit-domain-extension
   // This .bit domain is not in cache, get the IP from dotbit.me
   var xhr = new XMLHttpRequest();
@@ -72,28 +78,43 @@ function upgradeSync(requestDetails) {
   xhr.open("GET", apiUrl, false);
   xhr.onreadystatechange = function() {
     if (xhr.readyState == 4) {
+      if (xhr.status != 200) {
+        console.log("Error received from API: status " + xhr.status);
+        upgrade = true;
+      }
+
       // Get the ip address returned from the DNS proxy server.
       var certResponse = xhr.responseText;
       // store the IP for .bit hostname in the local cache which is reset on each browser restart
       sessionStorage.setItem(hostname, certResponse);
-      console.log("Got response from sync server");
     }
   }
-  xhr.send();
+  try {
+    xhr.send();
+  } catch (e) {
+    console.log("Error reaching API: " + e.toString());
+    upgrade = true;
+  }
   // block the request until the new proxy settings are set. Block for up to two seconds.
-  sleep(2000, hostname);
+  if (sleep(2000, hostname)) {
+    console.log("API timed out");
+    upgrade = true;
+  }
 
   // Get the IP from the session storage.
   var result = sessionStorage.getItem(hostname);
-  if (result.trim() == "") {
-    return {};
+  if (result.trim() != "") {
+    console.log("Upgraded via TLSA: " + host);
+    upgrade = true;
   }
-  console.log("Upgraded via TLSA: " + host);
-  url.protocol = "https:";
-  // Chromium doesn't support "upgradeToSecure", so we use "redirectUrl" instead
-  return {"redirectUrl": url.toString()};
-  // TODO: handle case where a timeout has happened.
-  // TODO: handle case where a DNS error has happened.
+
+  if (upgrade) {
+    url.protocol = "https:";
+    // Chromium doesn't support "upgradeToSecure", so we use "redirectUrl" instead
+    return {"redirectUrl": url.toString()};
+  }
+
+  return {};
 }
 
 function upgradeCompat(requestDetails) {
