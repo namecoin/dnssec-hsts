@@ -1,5 +1,5 @@
 /*
-Copyright 2017-2018 Jeremy Rand.
+Copyright 2017-2019 Jeremy Rand.
 
 This file is part of DNSSEC-HSTS.
 
