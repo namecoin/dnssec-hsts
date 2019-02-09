@@ -6,9 +6,17 @@ DNSSEC-HSTS is a WebExtension that upgrades HTTP to HTTPS (simulating HSTS) for 
 
 ## Installation
 
+### Firefox
+
 You'll first need to install the [native (Go) component](https://github.com/namecoin/dnssec-hsts-native) of DNSSEC-HSTS.  Then install DNSSEC-HSTS in Firefox as you would any other WebExtension.
 
-I have no idea whether DNSSEC-HSTS works in Chromium.  Test reports welcome!
+### Chromium
+
+You'll first need to install [certdehydrate-dane-rest-api](https://github.com/namecoin/certdehydrate-dane-rest-api).  Then install DNSSEC-HSTS in Firefox as you would any other WebExtension.
+
+### Other browsers
+
+I have no idea whether DNSSEC-HSTS works in browsers besides Firefox and Chromium.  Test reports welcome!
 
 ## Warnings
 
