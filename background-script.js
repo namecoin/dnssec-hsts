@@ -45,21 +45,21 @@ function upgradeAsync(requestDetails) {
 
 // Adapted from Tagide/chrome-bit-domain-extension
 // Returns true if timed out, returns false if hostname showed up
-function sleep(milliseconds, hostname) {
+function sleep(milliseconds, queryFinishedRef) {
   // synchronous XMLHttpRequests from Chrome extensions are not blocking event handlers. That's why we use this
-  // pretty little sleep function to try to get the IP of a .bit domain before the request times out.
+  // pretty little sleep function to try to get the API response before the request times out.
   var start = new Date().getTime();
   for (var i = 0; i < 1e7; i++) {
     if ((new Date().getTime() - start) > milliseconds) {
       return true;
     }
-    if (sessionStorage.getItem(hostname) != null) {
+    if (queryFinishedRef["val"]) {
       return false;
     }
   }
 }
 
-// Compatibility for Chromium, which doesn't support async onBeforeRequest
+// Compatibility for Chromium/Edge, which don't support async onBeforeRequest
 // See Chromium Bug 904365
 function upgradeSync(requestDetails) {
   const url = new URL(requestDetails.url);
@@ -68,12 +68,13 @@ function upgradeSync(requestDetails) {
   const port = url.port;
 
   var certResponse;
+  var queryFinishedRef = {"val": false};
 
   var upgrade = false;
   var lookupError = false;
 
   // Adapted from Tagide/chrome-bit-domain-extension
-  // This .bit domain is not in cache, get the IP from dotbit.me
+  // Get the TLSA records from the API
   var xhr = new XMLHttpRequest();
   var apiUrl = "http://127.0.0.1:8080/lookup?domain="+encodeURIComponent(hostname);
   // synchronous XMLHttpRequest is actually asynchronous
@@ -86,10 +87,10 @@ function upgradeSync(requestDetails) {
         lookupError = true;
       }
 
-      // Get the ip address returned from the DNS proxy server.
+      // Get the certs returned from the API server.
       certResponse = xhr.responseText;
-      // store the IP for .bit hostname in the local cache which is reset on each browser restart
-      sessionStorage.setItem(hostname, certResponse);
+      // Notify the sleep function that we're ready to proceed
+      queryFinishedRef["val"] = true;
     }
   }
   try {
@@ -98,13 +99,14 @@ function upgradeSync(requestDetails) {
     console.log("Error reaching API: " + e.toString());
     lookupError = true;
   }
-  // block the request until the new proxy settings are set. Block for up to two seconds.
-  if (sleep(2000, hostname)) {
+  // block the request until the API response is received. Block for up to two
+  // seconds.
+  if (sleep(2000, queryFinishedRef)) {
     console.log("API timed out");
     lookupError = true;
   }
 
-  // Get the IP from the session storage.
+  // Check if any certs exist in the result
   var result = certResponse;
   if (result.trim() != "") {
     console.log("Upgraded via TLSA: " + host);
