@@ -67,6 +67,8 @@ function upgradeSync(requestDetails) {
   const hostname = url.hostname;
   const port = url.port;
 
+  var certResponse;
+
   var upgrade = false;
   var lookupError = false;
 
@@ -85,7 +87,7 @@ function upgradeSync(requestDetails) {
       }
 
       // Get the ip address returned from the DNS proxy server.
-      var certResponse = xhr.responseText;
+      certResponse = xhr.responseText;
       // store the IP for .bit hostname in the local cache which is reset on each browser restart
       sessionStorage.setItem(hostname, certResponse);
     }
@@ -103,7 +105,7 @@ function upgradeSync(requestDetails) {
   }
 
   // Get the IP from the session storage.
-  var result = sessionStorage.getItem(hostname);
+  var result = certResponse;
   if (result.trim() != "") {
     console.log("Upgraded via TLSA: " + host);
     upgrade = true;
