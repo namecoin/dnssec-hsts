@@ -17,37 +17,123 @@ You should have received a copy of the GNU General Public License
 along with DNSSEC-HSTS.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-/*
-On startup, connect to the "dnssec_hsts" app.
-*/
-var nativePort = browser.runtime.connectNative("dnssec_hsts");
+function queryUpgradeNative(requestDetails, resolve, reject) {
+  const url = new URL(requestDetails.url);
+  const host = url.host;
+  const hostname = url.hostname;
+  const port = url.port;
+  if(! pendingUpgradeChecks.has(host)) {
+    pendingUpgradeChecks.set(host, new Set());
 
-// match pattern for the URLs to upgrade
-var pattern = "http://*/*";
+    const message = {"host": host, "hostname": hostname, "port": port};
 
-var pendingUpgradeChecks = new Map();
+    // Send message to the native DNSSEC app
+    nativePort.postMessage(message);
+  }
+  pendingUpgradeChecks.get(host).add(resolve);
+}
 
 // upgradeAsync function returns a Promise
 // which is resolved with the upgrade after the native DNSSEC app replies
 function upgradeAsync(requestDetails) {
   var asyncCancel = new Promise((resolve, reject) => {
-    const url = new URL(requestDetails.url);
-    const host = url.host;
-    const hostname = url.hostname;
-    const port = url.port;
-    if(! pendingUpgradeChecks.has(host)) {
-      pendingUpgradeChecks.set(host, new Set());
-
-      const message = {"host": host, "hostname": hostname, "port": port};
-
-      // Send message to the native DNSSEC app
-      nativePort.postMessage(message);
-    }
-    pendingUpgradeChecks.get(host).add(resolve);
+    queryUpgradeNative(requestDetails, resolve, reject);
   });
 
   return asyncCancel;
 }
+
+// Adapted from Tagide/chrome-bit-domain-extension
+function sleep(milliseconds, hostname) {
+	// synchronous XMLHttpRequests from Chrome extensions are not blocking event handlers. That's why we use this
+	// pretty little sleep function to try to get the IP of a .bit domain before the request times out.
+	var start = new Date().getTime();
+	for (var i = 0; i < 1e7; i++) {
+		if (((new Date().getTime() - start) > milliseconds) || (sessionStorage.getItem(hostname) != null)){
+			break;
+		}
+	}
+}
+
+// Compatibility for Chromium, which doesn't support async onBeforeRequest
+// See Chromium Bug 904365
+function upgradeSync(requestDetails) {
+  const url = new URL(requestDetails.url);
+  const host = url.host;
+  const hostname = url.hostname;
+  const port = url.port;
+
+  // Adapted from Tagide/chrome-bit-domain-extension
+  // This .bit domain is not in cache, get the IP from dotbit.me
+  var xhr = new XMLHttpRequest();
+  var apiUrl = "http://127.0.0.1:8080/lookup?domain="+encodeURIComponent(hostname);
+  // synchronous XMLHttpRequest is actually asynchronous
+  // check out https://developer.chrome.com/extensions/webRequest
+  xhr.open("GET", apiUrl, false);
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState == 4) {
+      // Get the ip address returned from the DNS proxy server.
+      var certResponse = xhr.responseText;
+      // store the IP for .bit hostname in the local cache which is reset on each browser restart
+      sessionStorage.setItem(hostname, certResponse);
+      console.log("Got response from sync server");
+    }
+  }
+  xhr.send();
+  // block the request until the new proxy settings are set. Block for up to two seconds.
+  sleep(2000, hostname);
+
+  // Get the IP from the session storage.
+  var result = sessionStorage.getItem(hostname);
+  if (result.trim() == "") {
+    return {};
+  }
+  console.log("Upgraded via TLSA: " + host);
+  url.protocol = "https:";
+  // Chromium doesn't support "upgradeToSecure", so we use "redirectUrl" instead
+  return {"redirectUrl": url.toString()};
+  // TODO: handle case where a timeout has happened.
+  // TODO: handle case where a DNS error has happened.
+}
+
+function upgradeCompat(requestDetails) {
+  if (onFirefox()) {
+    return upgradeAsync(requestDetails);
+  } else {
+    return upgradeSync(requestDetails);
+  }
+}
+
+// Based on https://stackoverflow.com/a/45985333
+function onFirefox() {
+  if (typeof chrome !== "undefined" && typeof browser !== "undefined") {
+    return true;
+  }
+  return false;
+}
+
+console.log("Testing for Firefox: " + onFirefox());
+
+var compatBrowser;
+// Firefox supports both browser and chrome; Chromium only supports chrome;
+// Edge only supports browser.  See https://stackoverflow.com/a/45985333
+if (typeof browser !== "undefined") {
+  console.log("Testing for browser/chrome: browser");
+  compatBrowser = browser;
+} else {
+  console.log("Testing for browser/chrome: chrome");
+  compatBrowser = chrome;
+}
+
+/*
+On startup, connect to the "dnssec_hsts" app.
+*/
+var nativePort = compatBrowser.runtime.connectNative("org.namecoin.dnssec_hsts");
+
+// match pattern for the URLs to upgrade
+var pattern = "http://*/*";
+
+var pendingUpgradeChecks = new Map();
 
 /*
 Listen for messages from the native DNSSEC app.
@@ -67,7 +153,7 @@ nativePort.onMessage.addListener((response) => {
 
   for (let item of pendingUpgradeChecks.get(host)) {
     if (hasTLSA) {
-      item({upgradeToSecure: true});
+      item({"upgradeToSecure": true});
       console.log("Upgraded via TLSA: " + host);
     } else {
       item({});
@@ -79,8 +165,8 @@ nativePort.onMessage.addListener((response) => {
 
 // add the listener,
 // passing the filter argument and "blocking"
-browser.webRequest.onBeforeRequest.addListener(
-  upgradeAsync,
+compatBrowser.webRequest.onBeforeRequest.addListener(
+  upgradeCompat,
   {urls: [pattern]},
   ["blocking"]
 );
