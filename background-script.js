@@ -68,6 +68,7 @@ function upgradeSync(requestDetails) {
   const port = url.port;
 
   var upgrade = false;
+  var lookupError = false;
 
   // Adapted from Tagide/chrome-bit-domain-extension
   // This .bit domain is not in cache, get the IP from dotbit.me
@@ -80,7 +81,7 @@ function upgradeSync(requestDetails) {
     if (xhr.readyState == 4) {
       if (xhr.status != 200) {
         console.log("Error received from API: status " + xhr.status);
-        upgrade = true;
+        lookupError = true;
       }
 
       // Get the ip address returned from the DNS proxy server.
@@ -93,12 +94,12 @@ function upgradeSync(requestDetails) {
     xhr.send();
   } catch (e) {
     console.log("Error reaching API: " + e.toString());
-    upgrade = true;
+    lookupError = true;
   }
   // block the request until the new proxy settings are set. Block for up to two seconds.
   if (sleep(2000, hostname)) {
     console.log("API timed out");
-    upgrade = true;
+    lookupError = true;
   }
 
   // Get the IP from the session storage.
@@ -108,6 +109,9 @@ function upgradeSync(requestDetails) {
     upgrade = true;
   }
 
+  if (lookupError) {
+    return {"redirectUrl": compatBrowser.runtime.getURL("/pages/lookup_error/index.html")};
+  }
   if (upgrade) {
     url.protocol = "https:";
     // Chromium doesn't support "upgradeToSecure", so we use "redirectUrl" instead
