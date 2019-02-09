@@ -135,14 +135,34 @@ function buildBlockingResponse(url, upgrade, lookupError) {
   return {};
 }
 
+// Only use this on initial extension startup; afterwards you should use
+// resetRequestListener instead.
 function attachRequestListener() {
+  // This shim function is a hack so that we can add a new listener before we
+  // remove the old one.  In theory JavaScript's single-threaded nature makes
+  // that irrelevant, but I don't trust browsers to behave sanely on this.
+  currentRequestListener = function(requestDetails) {
+    return upgradeCompat(requestDetails);
+  };
+
   // add the listener,
   // passing the filter argument and "blocking"
   compatBrowser.webRequest.onBeforeRequest.addListener(
-    upgradeCompat,
+    currentRequestListener,
     {urls: [buildPattern(matchHost)]},
     ["blocking"]
   );
+}
+
+// Attaches a new listener based on the current matchHost, and then removes the
+// old listener.  The ordering is intended to prevent race conditions where the
+// protection is disabled.
+function resetRequestListener() {
+  var oldListener = currentRequestListener;
+
+  attachRequestListener();
+
+  compatBrowser.webRequest.onBeforeRequest.removeListener(oldListener);
 }
 
 // Builds a match pattern for all HTTP URL's for the specified host
@@ -177,6 +197,7 @@ var pendingUpgradeChecks = new Map();
 
 // host for match pattern for the URLs to upgrade
 var matchHost = "*.bit";
+var currentRequestListener;
 
 // Firefox is the only browser that supports async onBeforeRequest, and
 // therefore is the only browser that we can use native messaging with.
@@ -211,4 +232,3 @@ if (onFirefox()) {
 }
 
 attachRequestListener();
-
