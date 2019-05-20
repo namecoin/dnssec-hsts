@@ -12,7 +12,7 @@ You'll first need to install the [native (Go) component](https://github.com/name
 
 ### Chromium
 
-You'll first need to install [certdehydrate-dane-rest-api](https://github.com/namecoin/certdehydrate-dane-rest-api).  Then install DNSSEC-HSTS in Firefox as you would any other WebExtension.
+You'll first need to install [certdehydrate-dane-rest-api](https://github.com/namecoin/certdehydrate-dane-rest-api).  Then install DNSSEC-HSTS in Chromium as you would any other WebExtension.
 
 ### Other browsers
 
