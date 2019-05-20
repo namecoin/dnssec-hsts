@@ -8,11 +8,45 @@ DNSSEC-HSTS is a WebExtension that upgrades HTTP to HTTPS (simulating HSTS) for 
 
 ### Firefox
 
-You'll first need to install the [native (Go) component](https://github.com/namecoin/dnssec-hsts-native) of DNSSEC-HSTS.  Then install DNSSEC-HSTS in Firefox as you would any other WebExtension.
+You'll first need to install the [native (Go) component](https://github.com/namecoin/dnssec-hsts-native) of DNSSEC-HSTS.  Then, if you're on GNU/Linux, do this:
+
+~~~
+git clone https://github.com/namecoin/dnssec-hsts.git
+sudo rm -rf /usr/share/webext/dnssec-hsts/
+sudo cp -a ./dnssec-hsts /usr/share/webext/dnssec-hsts
+sudo ln -s -T /usr/share/webext/dnssec-hsts "/usr/share/mozilla/extensions/{ec8030f7-c20a-464f-9b0e-13a3a9e97384}/dnssec-hsts"
+~~~
+
+You may need to restart Firefox, and/or enable the extension in the Addons dialog.  You're done!
+
+If you're on another OS, you'll need to disable XPI extension signature checking in Firefox.  Then, do this:
+
+~~~
+git clone https://github.com/namecoin/dnssec-hsts.git
+cd dnssec-hsts
+zip dnssec-hsts@namecoin.org.xpi
+~~~
+
+Then open `dnssec-hsts@namecoin.org.xpi` in Firefox, and accept the extension installation dialog.
+
+### Tor Browser
+
+Follow the Firefox instructions for non-GNU/Linux OS's, even if you're on GNU/Linux.  You're done!
 
 ### Chromium
 
-You'll first need to install [certdehydrate-dane-rest-api](https://github.com/namecoin/certdehydrate-dane-rest-api).  Then install DNSSEC-HSTS in Chromium as you would any other WebExtension.
+You'll first need to install [certdehydrate-dane-rest-api](https://github.com/namecoin/certdehydrate-dane-rest-api).
+
+Then, if you're on GNU/Linux, do this:
+
+~~~
+git clone https://github.com/namecoin/dnssec-hsts.git
+sudo rm -rf /usr/share/webext/dnssec-hsts/
+sudo cp -a ./dnssec-hsts /usr/share/webext/dnssec-hsts
+sudo ln -s -T /usr/share/webext/dnssec-hsts /usr/share/chromium/extensions/dnssec-hsts
+~~~
+
+If you're on another OS, look up how to install unpacked extensions in Chromium.
 
 ### Other browsers
 
