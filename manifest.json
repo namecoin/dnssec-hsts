@@ -15,8 +15,7 @@
     "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsn8XcKugoRr50Iw5EjDJNGtnmduoQ1/c8sVBN37uebf3/HEATXzY0aDgPxuBCA8i/9NzZh/CZT4rEt3YZekc9wH6+CdBruTfx+FsYgq/zG1SUgBsa4P9Cg0WRbnjKF2b7732LLaK5X/0CXmsV+RZYswQW1nBkuo4MHUVMvQGEjV8ppJYqeKgyJr27+1KuEfMFwtuGtQWCVjKRtFeXWh3hJKQ37CjGLpaEfTHFitL4d7i3B0/5E6m3tRVr2kxiPAMHz2QHjZBtDeUY2cR3VCuofIeuXH4mAZBGyNfylk8I28ydcogw7V9x1k38iVFGa6+J+VQMCwdoLXdjvKvZC1gaQIDAQAB",
 
     "icons": {
-        "48": "icons/namecoin-coin.svg",
-        "96": "icons/namecoin-coin.svg"
+        "100": "icons/namecoin-coin.svg"
     },
 
     "permissions": ["nativeMessaging", "webRequest", "webRequestBlocking", "http://*/*"],
